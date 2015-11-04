@@ -6,6 +6,7 @@ import spark.template.mustache.MustacheTemplateEngine;
 
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -21,9 +22,10 @@ public class Main {
         stmt.setTimestamp(2, Timestamp.valueOf(startDate));
         stmt.execute();
     }
-    public static ArrayList<Event> selectEvents(Connection conn) throws SQLException {
+    public static ArrayList<Event> selectEvents(Connection conn, boolean isAsc) throws SQLException { //isAsc= asscending
         ArrayList<Event> events = new ArrayList();
-        PreparedStatement stmt = conn.prepareStatement("SELECT * FROM events");
+        String query = String.format("SELECT * FROM events ORDER BY start_date %s", isAsc ? "ASC" : "DESC");
+        PreparedStatement stmt = conn.prepareStatement (query);//("SELECT * FROM events ORDER BY ASC");
         ResultSet results = stmt.executeQuery();
         while (results.next()) {
             Event event = new Event();
@@ -34,6 +36,9 @@ public class Main {
         }
         return events;
     }
+    public static ArrayList<Event> selectEvents(Connection conn) throws SQLException {
+        return selectEvents(conn, true);
+    }
 
     public static void main(String[] args) throws SQLException {
         Connection conn = DriverManager.getConnection("jdbc:h2:./main");
@@ -41,9 +46,14 @@ public class Main {
         Spark.get(
                 "/",
                 ((request, response) -> {
+                    String isAscStr = request.queryParams("isAsc");
+                    boolean isAsc = isAscStr != null && isAscStr.equals("true");
+
+
                     HashMap m = new HashMap();
                     m.put("now", LocalDateTime.now()); //this sets your current date and time
-                    m.put("events", selectEvents(conn));
+                    m.put("events", selectEvents(conn, isAsc));
+                    m.put("isAsc", isAsc);
                     return new ModelAndView(m, "events.html");
                 }),
                 new MustacheTemplateEngine()
